@@ -2,6 +2,8 @@
 
 Small browser PDF text editor, to edit existing text in a pdf file.
 
+![](screenshot.png)
+
 ## Local development
 
 ```sh
