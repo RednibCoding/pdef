@@ -97,6 +97,10 @@ h1 {
   background: #1b5139;
 }
 
+.actions .downloadButton {
+  grid-column: 1 / -1;
+}
+
 button:disabled,
 textarea:disabled {
   cursor: not-allowed;
@@ -165,6 +169,15 @@ textarea:disabled {
   min-height: 32px;
 }
 
+.iconButton.dangerButton {
+  color: #a43d32;
+  background: #f7e8e5;
+}
+
+.iconButton.dangerButton:hover:not(:disabled) {
+  background: #f1d6d1;
+}
+
 textarea {
   width: 100%;
   min-height: 180px;
@@ -176,6 +189,48 @@ textarea {
   color: #17211d;
   background: transparent;
   line-height: 1.45;
+}
+
+.imageInspector {
+  display: flex;
+  min-height: 180px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  text-align: center;
+}
+
+.imageInspector img {
+  width: min(100%, 180px);
+  max-height: 150px;
+  margin-bottom: 14px;
+  border: 1px solid #dbe1dc;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #f3f5f2;
+}
+
+.imageInspector strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imageInspector span {
+  margin-top: 4px;
+  color: #67736c;
+  font-size: 0.82rem;
+}
+
+.imageInspector p {
+  max-width: 230px;
+  margin: 12px 0 0;
+  color: #67736c;
+  font-size: 0.86rem;
+  line-height: 1.4;
 }
 
 .stats {
@@ -258,6 +313,10 @@ textarea {
   user-select: none;
 }
 
+.placingImage .pageFrame {
+  cursor: crosshair;
+}
+
 .textHitbox {
   position: absolute;
   display: block;
@@ -290,6 +349,73 @@ textarea {
 
 .textHitbox.selected.edited {
   outline: 2px solid #225f44;
+}
+
+.imageOverlay {
+  position: absolute;
+  cursor: move;
+  outline: 1px solid rgb(34 95 68 / 45%);
+  touch-action: none;
+  user-select: none;
+}
+
+.imageOverlay:hover,
+.imageOverlay.selected {
+  outline: 2px solid #225f44;
+}
+
+.imageOverlay img {
+  pointer-events: none;
+}
+
+.imageResizeHandle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid #225f44;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  background: #ffffff;
+}
+
+.imageOverlay.selected .imageResizeHandle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.imageResizeHandle.nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+  transform: translate(-50%, -50%);
+}
+
+.imageResizeHandle.ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+  transform: translate(50%, -50%);
+}
+
+.imageResizeHandle.sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+  transform: translate(-50%, 50%);
+}
+
+.imageResizeHandle.se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+  transform: translate(50%, 50%);
+}
+
+.placingImage .imageOverlay,
+.placingImage .textHitbox {
+  pointer-events: none;
 }
 
 .spin {

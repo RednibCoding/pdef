@@ -1,6 +1,8 @@
 # Pdef
 
-Small browser PDF text editor, to edit existing text in a pdf file.
+Small browser PDF editor for changing existing text and placing local images.
+
+Images can be selected from the hard drive (or dropped onto the app), placed on any page, moved, resized from their corners, and included in the downloaded PDF.
 
 ![](screenshot.png)
 
