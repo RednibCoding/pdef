@@ -55,6 +55,24 @@ type PendingImage = Pick<PlacedImage, "name" | "dataUrl" | "kind"> & {
   naturalHeight: number;
 };
 
+type FormField = {
+  id: string;
+  pageIndex: number;
+  name: string;
+  type: "text" | "checkbox";
+  value: string | boolean;
+  originalValue: string | boolean;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  maxLength?: number;
+  multiline?: boolean;
+  comb?: boolean;
+  textAlignment?: "left" | "center" | "right";
+};
+
 type RenderedPage = {
   pageIndex: number;
   imageUrl: string;
@@ -63,6 +81,8 @@ type RenderedPage = {
   viewportTransform: number[];
   boxes: TextBox[];
   images: PlacedImage[];
+  formFields: FormField[];
+  formWidgetCount: number;
 };
 
 function App() {
@@ -86,6 +106,17 @@ function App() {
   );
   const editedCount = boxesByPage.reduce((total, pageBoxes) => total + pageBoxes.length, 0);
   const imageCount = pages.reduce((total, page) => total + page.images.length, 0);
+  const formWidgetCount = pages.reduce((total, page) => total + page.formWidgetCount, 0);
+  const formEditsByName = useMemo(() => {
+    const edits = new Map<string, FormField>();
+    pages.forEach((page) => {
+      page.formFields.forEach((field) => {
+        if (field.value !== field.originalValue) edits.set(field.name, field);
+      });
+    });
+    return edits;
+  }, [pages]);
+  const formEditCount = formEditsByName.size;
   const selectedBox = pages.flatMap((page) => page.boxes).find((box) => box.id === selectedId);
   const selectedImage = pages.flatMap((page) => page.images).find((image) => image.id === selectedImageId);
 
@@ -150,6 +181,8 @@ function App() {
 
         const textContent = await page.getTextContent();
         const boxes = makeTextBoxes(textContent.items, pageIndex, viewport);
+        const annotations = await page.getAnnotations({ intent: "display" });
+        const formFields = makeFormFields(annotations, pageIndex, viewport);
 
         renderedPages.push({
           pageIndex,
@@ -159,13 +192,18 @@ function App() {
           viewportTransform: [...viewport.transform],
           boxes,
           images: [],
+          formFields,
+          formWidgetCount: annotations.filter((annotation) => annotation.subtype === "Widget" && annotation.fieldType).length,
         });
       }
 
       setFileName(file.name);
       setFileBytes(bytes);
       setPages(renderedPages);
-      setStatus(`${pdf.numPages} page${pdf.numPages === 1 ? "" : "s"}`);
+      const fieldCount = renderedPages.reduce((total, page) => total + page.formFields.length, 0);
+      setStatus(
+        `${pdf.numPages} page${pdf.numPages === 1 ? "" : "s"}${fieldCount ? ` · ${fieldCount} fillable field${fieldCount === 1 ? "" : "s"}` : ""}`,
+      );
     } catch (error) {
       setFileBytes(null);
       setPages([]);
@@ -389,6 +427,15 @@ function App() {
     );
   }
 
+  function updateFormField(name: string, value: string | boolean) {
+    setPages((currentPages) =>
+      currentPages.map((page) => ({
+        ...page,
+        formFields: page.formFields.map((field) => (field.name === name ? { ...field, value } : field)),
+      })),
+    );
+  }
+
   async function downloadPdf() {
     if (!fileBytes) return;
     setIsSaving(true);
@@ -397,11 +444,23 @@ function App() {
     try {
       const pdfDoc = await PDFDocument.load(fileBytes.slice());
 
+      const form = formEditCount > 0 || (imageCount > 0 && formWidgetCount > 0) ? pdfDoc.getForm() : null;
+      if (form && formEditCount > 0) {
+        formEditsByName.forEach((field) => {
+          if (field.type === "text") {
+            form.getTextField(field.name).setText(String(field.value));
+          } else {
+            const checkBox = form.getCheckBox(field.name);
+            if (field.value) checkBox.check();
+            else checkBox.uncheck();
+          }
+        });
+      }
+
       // Form widgets are annotations, so PDF readers paint them above normal
       // page content. Flatten them first to keep signature-field backgrounds
       // behind images that the user places on the page.
-      if (imageCount > 0) {
-        const form = pdfDoc.getForm();
+      if (imageCount > 0 && form) {
         if (form.getFields().length > 0) {
           const widgetRefs = form
             .getFields()
@@ -523,7 +582,7 @@ function App() {
             type="button"
             className="downloadButton"
             onClick={downloadPdf}
-            disabled={!fileBytes || isSaving || editedCount + imageCount === 0}
+            disabled={!fileBytes || isSaving || editedCount + imageCount + formEditCount === 0}
           >
             {isSaving ? <Loader2 className="spin" size={18} /> : <Download size={18} />}
             <span>{isSaving ? "Saving" : "Download"}</span>
@@ -589,7 +648,8 @@ function App() {
         <div className="stats">
           <span>{pages.length} page{pages.length === 1 ? "" : "s"}</span>
           <span>
-            {editedCount} text edit{editedCount === 1 ? "" : "s"} · {imageCount} image{imageCount === 1 ? "" : "s"}
+            {editedCount + formEditCount} edit{editedCount + formEditCount === 1 ? "" : "s"} · {imageCount} image
+            {imageCount === 1 ? "" : "s"}
           </span>
         </div>
 
@@ -645,6 +705,45 @@ function App() {
                   {box.text}
                 </button>
               ))}
+              {page.formFields.map((field) =>
+                field.type === "checkbox" ? (
+                  <input
+                    key={field.id}
+                    type="checkbox"
+                    className="formFieldOverlay formCheckbox"
+                    style={{ left: field.left, top: field.top, width: field.width, height: field.height }}
+                    checked={Boolean(field.value)}
+                    onChange={(event) => updateFormField(field.name, event.target.checked)}
+                    aria-label={field.name}
+                    title={field.name}
+                  />
+                ) : field.multiline ? (
+                  <textarea
+                    key={field.id}
+                    className={`formFieldOverlay formTextField ${field.comb ? "comb" : ""}`}
+                    style={getFormFieldStyle(field)}
+                    value={String(field.value)}
+                    maxLength={field.maxLength}
+                    onChange={(event) => updateFormField(field.name, event.target.value)}
+                    aria-label={field.name}
+                    title={field.name}
+                  />
+                ) : (
+                  <input
+                    key={field.id}
+                    type="text"
+                    className={`formFieldOverlay formTextField ${field.comb ? "comb" : ""}`}
+                    style={getFormFieldStyle(field)}
+                    value={String(field.value)}
+                    maxLength={field.maxLength}
+                    inputMode={field.comb ? "numeric" : undefined}
+                    onChange={(event) => updateFormField(field.name, event.target.value)}
+                    aria-label={field.name}
+                    title={field.name}
+                    spellCheck={false}
+                  />
+                ),
+              )}
               {page.images.map((image) => (
                 <div
                   key={image.id}
@@ -678,6 +777,112 @@ function App() {
       </section>
     </main>
   );
+}
+
+function makeFormFields(annotations: unknown[], pageIndex: number, viewport: pdfjs.PageViewport) {
+  const fields: FormField[] = [];
+
+  annotations.forEach((item) => {
+    const annotation = item as {
+      id?: string;
+      subtype?: string;
+      fieldType?: string;
+      fieldName?: string;
+      fieldValue?: string | null;
+      exportValue?: string | null;
+      checkBox?: boolean;
+      readOnly?: boolean;
+      hidden?: boolean;
+      rect?: number[];
+      maxLen?: number;
+      multiLine?: boolean;
+      comb?: boolean;
+      textAlignment?: number | null;
+      defaultAppearanceData?: { fontSize?: number } | null;
+    };
+
+    if (
+      annotation.subtype !== "Widget" ||
+      !annotation.id ||
+      !annotation.fieldName ||
+      !annotation.rect ||
+      annotation.hidden ||
+      annotation.readOnly
+    ) {
+      return;
+    }
+
+    const viewportRect = viewport.convertToViewportRectangle(annotation.rect);
+    const left = Math.min(viewportRect[0], viewportRect[2]);
+    const top = Math.min(viewportRect[1], viewportRect[3]);
+    const width = Math.abs(viewportRect[2] - viewportRect[0]);
+    const height = Math.abs(viewportRect[3] - viewportRect[1]);
+    if (width < 2 || height < 2) return;
+
+    if (annotation.fieldType === "Tx") {
+      const value = typeof annotation.fieldValue === "string" ? annotation.fieldValue : "";
+      fields.push({
+        id: annotation.id,
+        pageIndex,
+        name: annotation.fieldName,
+        type: "text",
+        value,
+        originalValue: value,
+        left,
+        top,
+        width,
+        height,
+        fontSize: Math.max((annotation.defaultAppearanceData?.fontSize ?? 0) * RENDER_SCALE, height * 0.58, 8),
+        maxLength: annotation.maxLen && annotation.maxLen > 0 ? annotation.maxLen : undefined,
+        multiline: Boolean(annotation.multiLine),
+        comb: Boolean(annotation.comb),
+        textAlignment: annotation.textAlignment === 1 ? "center" : annotation.textAlignment === 2 ? "right" : "left",
+      });
+      return;
+    }
+
+    if (annotation.fieldType === "Btn" && annotation.checkBox) {
+      const value = annotation.exportValue
+        ? annotation.fieldValue === annotation.exportValue
+        : Boolean(annotation.fieldValue && annotation.fieldValue !== "Off");
+      fields.push({
+        id: annotation.id,
+        pageIndex,
+        name: annotation.fieldName,
+        type: "checkbox",
+        value,
+        originalValue: value,
+        left,
+        top,
+        width,
+        height,
+        fontSize: height * 0.75,
+      });
+    }
+  });
+
+  return fields;
+}
+
+function getFormFieldStyle(field: FormField): React.CSSProperties {
+  const style: React.CSSProperties = {
+    left: field.left,
+    top: field.top,
+    width: field.width,
+    height: field.height,
+    fontSize: field.fontSize,
+    textAlign: field.textAlignment,
+  };
+
+  if (field.comb && field.maxLength) {
+    const cellWidth = field.width / field.maxLength;
+    const glyphWidth = field.fontSize * 0.58;
+    style.letterSpacing = Math.max(cellWidth - glyphWidth, 0);
+    style.paddingLeft = Math.max((cellWidth - glyphWidth) / 2, 2);
+    style.backgroundSize = `${cellWidth}px 100%`;
+  }
+
+  return style;
 }
 
 function hasPdfFile(dataTransfer: DataTransfer) {

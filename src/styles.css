@@ -18,6 +18,7 @@ body {
 }
 
 button,
+input,
 textarea {
   font: inherit;
 }
@@ -351,6 +352,62 @@ textarea {
   outline: 2px solid #225f44;
 }
 
+.formFieldOverlay {
+  position: absolute;
+  margin: 0;
+  transform: translateY(-2px);
+}
+
+.formTextField {
+  min-height: 0;
+  resize: none;
+  border: 1px solid rgb(34 95 68 / 65%);
+  border-radius: 1px;
+  padding: 1px 3px;
+  outline: none;
+  color: #111915;
+  background-color: rgb(255 255 255 / 94%);
+  line-height: 1.05;
+}
+
+.formTextField:hover {
+  border-color: #225f44;
+  box-shadow: 0 0 0 1px rgb(34 95 68 / 25%);
+}
+
+.formTextField:focus {
+  border-color: #225f44;
+  box-shadow: 0 0 0 2px rgb(34 95 68 / 28%);
+}
+
+.formTextField.comb {
+  padding-right: 0;
+  background-image: linear-gradient(to right, transparent calc(100% - 1px), rgb(34 95 68 / 60%) calc(100% - 1px));
+  background-repeat: repeat-x;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.formCheckbox {
+  appearance: none;
+  border: 1px solid #225f44;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  background-color: #ffffff;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 80% 80%;
+}
+
+.formCheckbox:checked {
+  background-color: #225f44;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E");
+}
+
+.formCheckbox:focus-visible {
+  box-shadow: 0 0 0 3px rgb(34 95 68 / 28%);
+}
+
 .imageOverlay {
   position: absolute;
   cursor: move;
@@ -414,6 +471,7 @@ textarea {
 }
 
 .placingImage .imageOverlay,
+.placingImage .formFieldOverlay,
 .placingImage .textHitbox {
   pointer-events: none;
 }
