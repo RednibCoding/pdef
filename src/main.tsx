@@ -24,6 +24,7 @@ type TextBox = {
   width: number;
   height: number;
   fontSize: number;
+  fontName: string;
   pdfX: number;
   pdfY: number;
   pdfWidth: number;
@@ -1018,6 +1019,7 @@ function makeTextBoxes(items: unknown[], pageIndex: number, viewport: pdfjs.Page
           width: fragment.width,
           height: fragment.height,
           fontSize: fragment.fontSize,
+          fontName: fragment.fontName,
           pdfX: fragment.pdfX,
           pdfY: fragment.pdfY,
           pdfWidth: fragment.pdfWidth,
@@ -1042,6 +1044,7 @@ function makeTextFragment(item: unknown, viewport: pdfjs.PageViewport): TextFrag
     hasEOL?: boolean;
     width?: number;
     height?: number;
+    fontName?: string;
     transform?: number[];
   };
 
@@ -1063,6 +1066,7 @@ function makeTextFragment(item: unknown, viewport: pdfjs.PageViewport): TextFrag
     width,
     height,
     fontSize,
+    fontName: textItem.fontName ?? "",
     pdfX: textItem.transform[4],
     pdfY: textItem.transform[5],
     pdfWidth: Math.max(textItem.width ?? width / RENDER_SCALE, 1),
@@ -1074,12 +1078,19 @@ function makeTextFragment(item: unknown, viewport: pdfjs.PageViewport): TextFrag
 function shouldMergeFragment(box: TextBox, fragment: TextFragment) {
   const baselineDelta = Math.abs(box.pdfY - fragment.pdfY);
   const fontDelta = Math.abs(box.pdfFontSize - fragment.pdfFontSize);
-  const horizontalGap = fragment.pdfX - (box.pdfX + box.pdfWidth);
+  const estimatedBoxWidth = Math.max(box.text.length * box.pdfFontSize * 0.7, box.pdfFontSize);
+  const effectiveBoxWidth = Math.min(box.pdfWidth, estimatedBoxWidth * 2.5);
+  const horizontalGap = fragment.pdfX - (box.pdfX + effectiveBoxWidth);
   const baselineTolerance = Math.max(1.5, box.pdfFontSize * 0.25);
   const fontTolerance = Math.max(1, box.pdfFontSize * 0.25);
-  const gapTolerance = Math.max(18, box.pdfFontSize * 4);
+  const gapTolerance = Math.max(8, box.pdfFontSize * 1.5);
+  const sameFont = !box.fontName || !fragment.fontName || box.fontName === fragment.fontName;
+  const whitespaceBridgeIsTooWide =
+    !fragment.text.trim() && fragment.pdfWidth > Math.max(8, box.pdfFontSize * 1.5);
 
   return (
+    sameFont &&
+    !whitespaceBridgeIsTooWide &&
     baselineDelta <= baselineTolerance &&
     fontDelta <= fontTolerance &&
     horizontalGap <= gapTolerance &&
