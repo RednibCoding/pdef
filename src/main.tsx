@@ -13,6 +13,7 @@ const RENDER_SCALE = 1.6;
 const DEFAULT_SIDEBAR_WIDTH = 320;
 const MIN_SIDEBAR_WIDTH = 260;
 const MAX_SIDEBAR_WIDTH = 560;
+let textMeasureContext: CanvasRenderingContext2D | null = null;
 
 type TextBox = {
   id: string;
@@ -491,10 +492,17 @@ function App() {
         const page = pdfDoc.getPage(pageIndex);
 
         pageBoxes.forEach((box) => {
+          const originalTextWidth = font.widthOfTextAtSize(box.original, box.pdfFontSize);
+          const editedTextWidth = font.widthOfTextAtSize(box.text, box.pdfFontSize);
+          const coveredOriginalWidth = Math.max(
+            Math.min(box.pdfWidth, originalTextWidth * 1.12),
+            originalTextWidth,
+          );
+
           page.drawRectangle({
             x: box.pdfX - 0.8,
             y: box.pdfY - box.pdfHeight * 0.28,
-            width: Math.max(box.pdfWidth + 1.6, font.widthOfTextAtSize(box.text, box.pdfFontSize) + 1.6),
+            width: Math.max(coveredOriginalWidth, editedTextWidth) + 1.6,
             height: box.pdfHeight,
             color: rgb(1, 1, 1),
           });
@@ -692,7 +700,7 @@ function App() {
                   style={{
                     left: box.left,
                     top: box.top,
-                    width: Math.max(box.width, estimateTextWidth(box.text, box.fontSize), 12),
+                    width: getTextBoxDisplayWidth(box),
                     height: Math.max(box.height, 10),
                     fontSize: Math.max(box.fontSize, 8),
                   }}
@@ -975,7 +983,15 @@ function clampSidebarWidth(width: number) {
 }
 
 function estimateTextWidth(text: string, fontSize: number) {
-  return Math.max(text.length * fontSize * 0.56, fontSize);
+  textMeasureContext ??= document.createElement("canvas").getContext("2d");
+  if (!textMeasureContext) return Math.max(text.length * fontSize * 0.56, fontSize);
+  textMeasureContext.font = `${fontSize}px Arial, Helvetica, sans-serif`;
+  return Math.max(textMeasureContext.measureText(text).width, fontSize);
+}
+
+function getTextBoxDisplayWidth(box: TextBox) {
+  const measuredWidth = estimateTextWidth(box.text, box.fontSize);
+  return Math.max(measuredWidth, Math.min(box.width, measuredWidth * 1.12), 12);
 }
 
 function makeTextBoxes(items: unknown[], pageIndex: number, viewport: pdfjs.PageViewport) {
